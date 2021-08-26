@@ -35,12 +35,16 @@ struct Feed {
 
 #[derive(Clap)]
 struct Print {
-    /// The image you want to print out
+    /// The path to the image you want to print out
     input_image: String,
 
     /// The ditherer supposed to be used. none is good for text and vector graphics
     #[clap(arg_enum, short, long, default_value = "k-mean")]
     ditherer: Ditherers,
+
+    /// Rotate picture by 90 degrees
+    #[clap(short, long)]
+    rotate: bool,
 }
 
 #[derive(ArgEnum)]
@@ -87,7 +91,8 @@ async fn main_print(mut device: device::Device, print: Print) -> Result<(), Box<
         10,
     ));
 
-    let image = image::Image::load(&std::path::PathBuf::from(print.input_image)).unwrap();
+    let image =
+        image::Image::load(&std::path::PathBuf::from(print.input_image), print.rotate).unwrap();
 
     let image = match print.ditherer {
         Ditherers::None => image,

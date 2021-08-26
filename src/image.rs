@@ -22,9 +22,12 @@ fn rle_bytes(val: u8, mut counter: u32) -> Vec<u8> {
 }
 
 impl Image {
-    pub fn load(path: &Path) -> std::result::Result<Self, Box<dyn std::error::Error>> {
+    pub fn load(
+        path: &Path,
+        rotate: bool,
+    ) -> std::result::Result<Self, Box<dyn std::error::Error>> {
         let image = image::open(path)?;
-
+        let image = if rotate { image.rotate90() } else { image };
         let image = image
             .resize(
                 crate::protocol::PIXELS_PER_LINE as u32,
