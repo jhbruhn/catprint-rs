@@ -45,6 +45,10 @@ struct Print {
     /// Rotate picture by 90 degrees
     #[clap(short, long)]
     rotate: bool,
+
+    /// Don't use compression
+    #[clap(long)]
+    no_compress: bool,
 }
 
 #[derive(ArgEnum)]
@@ -112,7 +116,8 @@ async fn main_print(mut device: device::Device, print: Print) -> Result<(), Box<
         _ => protocol::DrawingMode::Image,
     };
 
-    let print = image.print(mode, quality, energy);
+    let use_compression = device.supports_compression() && !print.no_compress;
+    let print = image.print(mode, quality, energy, use_compression);
 
     device.queue_commands(&print);
     device.queue_command(protocol::Command::Feed(

@@ -66,55 +66,82 @@ impl Image {
     pub fn line(
         &self,
         y: u32,
+        use_compression: bool,
     ) -> Option<(bool, usize, [u8; crate::protocol::PIXELS_PER_LINE / 8])> {
         if y > self.image.height() {
-            None
-        } else {
-            let mut compressed = Vec::<u8>::new();
-
-            let mut counter = 0_u32;
-            let mut last_val = 2;
-            for x in 0..crate::protocol::PIXELS_PER_LINE {
-                let x = x as u32;
-                let pixel = self.image.get((x, y)).unwrap();
-                let val = if pixel > &self.mean { 0 } else { 1 };
-                if val == last_val {
-                    counter = counter + 1
-                } else if counter > 0 {
-                    compressed.extend(rle_bytes(last_val, counter));
-                    counter = 1;
-                }
-                last_val = val;
-            }
-            compressed.extend(rle_bytes(last_val, counter));
-
-            if compressed.len() > crate::protocol::PIXELS_PER_LINE / 8 {
-                let mut data = [0_u8; crate::protocol::PIXELS_PER_LINE / 8];
-                for x in 0..crate::protocol::PIXELS_PER_LINE {
-                    let x = x as u32;
-                    let pixel = self.image.get((x, y)).unwrap();
-                    let val = if pixel > &self.mean { 0 } else { 1 };
-                    let i = (x / 8) as usize;
-                    let j = x % 8;
-                    let current = data[i];
-                    data[i] = current | (val << j);
-                }
-
-                Some((false, crate::protocol::PIXELS_PER_LINE / 8, data))
-            } else {
-                use std::convert::TryInto;
-                let len = compressed.len();
-                compressed.resize(crate::protocol::PIXELS_PER_LINE / 8, 0);
-                Some((true, len, compressed.try_into().unwrap()))
-            }
+            return None;
         }
+
+        if use_compression {
+            self.line_compressed(y)
+        } else {
+            self.line_uncompressed(y)
+                .map(|(len, data)| (false, len, data))
+        }
+    }
+
+    pub fn line_compressed(
+        &self,
+        y: u32,
+    ) -> Option<(bool, usize, [u8; crate::protocol::PIXELS_PER_LINE / 8])> {
+        let mut compressed = Vec::<u8>::new();
+
+        let mut counter = 0_u32;
+        let mut last_val = 2;
+        for x in 0..crate::protocol::PIXELS_PER_LINE {
+            let x = x as u32;
+            let pixel = self.image.get((x, y)).unwrap();
+            let val = if pixel > &self.mean { 0 } else { 1 };
+            if val == last_val {
+                counter = counter + 1
+            } else if counter > 0 {
+                compressed.extend(rle_bytes(last_val, counter));
+                counter = 1;
+            }
+            last_val = val;
+        }
+        compressed.extend(rle_bytes(last_val, counter));
+
+        if compressed.len() > crate::protocol::PIXELS_PER_LINE / 8 {
+            self.line_uncompressed(y)
+                .map(|(len, data)| (false, len, data))
+        } else {
+            use std::convert::TryInto;
+            let len = compressed.len();
+            compressed.resize(crate::protocol::PIXELS_PER_LINE / 8, 0);
+            Some((true, len, compressed.try_into().unwrap()))
+        }
+    }
+
+    pub fn line_uncompressed(
+        &self,
+        y: u32,
+    ) -> Option<(usize, [u8; crate::protocol::PIXELS_PER_LINE / 8])> {
+        let mut data = [0_u8; crate::protocol::PIXELS_PER_LINE / 8];
+        for x in 0..crate::protocol::PIXELS_PER_LINE {
+            let x = x as u32;
+            let pixel = self.image.get((x, y)).unwrap();
+            let val = if pixel > &self.mean { 0 } else { 1 };
+            let i = (x / 8) as usize;
+            let j = x % 8;
+            let current = data[i];
+            data[i] = current | (val << j);
+        }
+
+        Some((crate::protocol::PIXELS_PER_LINE / 8, data))
     }
 
     pub fn line_count(&self) -> u32 {
         self.image.height()
     }
 
-    pub fn print(&self, mode: DrawingMode, quality: Quality, energy: u16) -> Vec<Command> {
+    pub fn print(
+        &self,
+        mode: DrawingMode,
+        quality: Quality,
+        energy: u16,
+        use_compression: bool,
+    ) -> Vec<Command> {
         let mut commands = vec![
             Command::SetQuality(quality),
             Command::SetEnergy(energy),
@@ -123,7 +150,7 @@ impl Image {
 
         commands.push(Command::MagicLattice(LatticeType::Start));
         for y in 0..self.line_count() {
-            let (compressed, len, pixels) = self.line(y).unwrap();
+            let (compressed, len, pixels) = self.line(y, use_compression).unwrap();
             commands.push(Command::Print(compressed, len, pixels));
         }
         commands.push(Command::MagicLattice(LatticeType::End));

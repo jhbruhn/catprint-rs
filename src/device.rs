@@ -11,6 +11,7 @@ const TX_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x0000ae01_0000_1000_8000_0
 #[derive(Debug)]
 pub struct Device {
     peripheral: btleplug::platform::Peripheral,
+    supports_compression: bool,
     tx_buffer: VecDeque<u8>,
 }
 
@@ -41,9 +42,16 @@ impl Device {
                                 peripheral.connect().await?;
                             }
                             let _ = peripheral.discover_characteristics().await?;
+
+                            let supports_compression = match name {
+                                "MX10" => false,
+                                _ => true,
+                            };
+
                             device_result = Ok(Device {
                                 peripheral,
                                 tx_buffer: VecDeque::new(),
+                                supports_compression,
                             });
                             break;
                         }
@@ -108,5 +116,9 @@ impl Device {
 
     pub async fn destroy(self) {
         self.peripheral.disconnect().await.unwrap();
+    }
+
+    pub fn supports_compression(&self) -> bool {
+        self.supports_compression
     }
 }
