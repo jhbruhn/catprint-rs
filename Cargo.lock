@@ -283,17 +283,17 @@ dependencies = [
 
 [[package]]
 name = "crc"
-version = "2.0.1-alpha.0"
-source = "git+ssh://git@github.com/mrhooray/crc-rs.git#747901f88620e360ced1c70eaec02383d0f36fe0"
+version = "3.2.1"
+source = "git+https://github.com/mrhooray/crc-rs.git#bb40d4e7c78938640fe4b8703ed43d5a407e3810"
 dependencies = [
  "crc-catalog",
 ]
 
 [[package]]
 name = "crc-catalog"
-version = "1.1.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
+checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crc32fast"
