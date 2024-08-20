@@ -72,7 +72,7 @@ impl Command {
             DeviceId(_) => 0xBB,
             SetSpeed(_) => 0xBD,
             SetDrawingMode(_) => 0xBE,
-            Print(true, _, _) => 0xBf, // compressed
+            Print(true, _, _) => 0xBF, // compressed
         }
     }
 
@@ -107,7 +107,7 @@ impl Command {
 
         let mut crc = CCITT.digest();
         crc.update(&payload);
-        let crc = crc.finalize() as u8;
+        let crc = crc.finalize();
 
         let payload_len = payload.len();
 
