@@ -93,7 +93,7 @@ impl Image {
             let pixel = self.image.get((x, y)).unwrap();
             let val = if pixel > &self.mean { 0 } else { 1 };
             if val == last_val {
-                counter = counter + 1
+                counter += 1
             } else if counter > 0 {
                 compressed.extend(rle_bytes(last_val, counter));
                 counter = 1;

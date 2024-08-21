@@ -2,20 +2,19 @@ use btleplug::platform::Manager;
 use catprint::*;
 use std::error::Error;
 
-use clap::{crate_authors, crate_version, AppSettings, ArgEnum, Clap};
+use clap::{Parser, ValueEnum};
 
-#[derive(Clap)]
-#[clap(version = crate_version!(), author = crate_authors!())]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 struct Opts {
     /// Set the device name of your printer.
-    #[clap(short, long, default_value = "GB02")]
+    #[arg(short, long, default_value = "GB02")]
     device_name: String,
-    #[clap(subcommand)]
+    #[command(subcommand)]
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 enum SubCommand {
     /// Move the paper without printing
     Feed(Feed),
@@ -24,7 +23,7 @@ enum SubCommand {
     Print(Print),
 }
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 struct Feed {
     /// Print debug info
     #[clap(short, long)]
@@ -33,13 +32,13 @@ struct Feed {
     length: u8,
 }
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 struct Print {
     /// The path to the image you want to print out
     input_image: String,
 
     /// The ditherer supposed to be used. none is good for text and vector graphics
-    #[clap(arg_enum, short, long, default_value = "k-mean")]
+    #[clap(value_enum, short, long, default_value = "k-mean")]
     ditherer: Ditherers,
 
     /// Rotate picture by 90 degrees
@@ -51,7 +50,7 @@ struct Print {
     no_compress: bool,
 }
 
-#[derive(ArgEnum)]
+#[derive(ValueEnum, Debug, Clone)]
 enum Ditherers {
     None,
     KMean,

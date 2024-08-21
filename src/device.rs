@@ -1,6 +1,5 @@
-use btleplug::api::{Central, Manager as _, Peripheral};
+use btleplug::api::{Central, Manager as _, Peripheral, ScanFilter, WriteType};
 use btleplug::platform::Manager;
-use std::collections::VecDeque;
 use std::error::Error;
 use std::time::Duration;
 use tokio::time;
@@ -12,7 +11,8 @@ const TX_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x0000ae01_0000_1000_8000_0
 pub struct Device {
     peripheral: btleplug::platform::Peripheral,
     supports_compression: bool,
-    tx_buffer: VecDeque<u8>,
+    tx_buffer: Vec<u8>,
+    tx_characteristic: btleplug::api::Characteristic,
 }
 
 impl Device {
@@ -26,7 +26,7 @@ impl Device {
         for adapter in adapter_list.iter() {
             println!("Starting scan...");
             adapter
-                .start_scan()
+                .start_scan(ScanFilter::default())
                 .await
                 .expect("Can't scan BLE adapter for connected devices...");
             time::sleep(Duration::from_secs(2)).await;
@@ -41,17 +41,27 @@ impl Device {
                             if !peripheral.is_connected().await? {
                                 peripheral.connect().await?;
                             }
-                            let _ = peripheral.discover_characteristics().await?;
 
-                            let supports_compression = match name {
-                                "MX10" => false,
-                                _ => true,
-                            };
+                            println!("Connected to {}", name);
+                            println!("Discovering services...");
+                            peripheral.discover_services().await?;
+
+                            let supports_compression = name != "MX10";
+
+                            let characteristics = peripheral.characteristics();
+
+                            println!("Found {} characteristics", characteristics.len());
+
+                            let tx_characteristic = characteristics
+                                .iter()
+                                .find(|c| c.uuid == TX_CHARACTERISTIC_UUID)
+                                .expect("Could not find TX characteristic");
 
                             device_result = Ok(Device {
                                 peripheral,
-                                tx_buffer: VecDeque::new(),
+                                tx_buffer: Vec::new(),
                                 supports_compression,
+                                tx_characteristic: tx_characteristic.clone(),
                             });
                             break;
                         }
@@ -60,6 +70,7 @@ impl Device {
             }
         }
 
+        println!("Scan complete");
         device_result
     }
 
@@ -74,42 +85,21 @@ impl Device {
     }
 
     pub async fn flush(&mut self) -> Result<(), Box<dyn Error>> {
-        const MTU_SIZE: usize = 20;
+        let chunks = self.tx_buffer.chunks(20);
 
-        while !self.tx_buffer.is_empty() {
-            let mut buf = Vec::with_capacity(MTU_SIZE);
-            for _ in 0..MTU_SIZE {
-                if let Some(byte) = self.tx_buffer.pop_front() {
-                    buf.push(byte);
-                } else {
-                    break;
-                }
+        let write_type = if chunks.len() > 1 {
+            WriteType::WithoutResponse
+        } else {
+            WriteType::WithResponse
+        };
 
-                // this could be nicer i guess
-            }
-
-            self.tx(&buf).await?;
+        for chunk in chunks {
+            self.peripheral
+                .write(&self.tx_characteristic, chunk, write_type)
+                .await
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
-
-        Ok(())
-    }
-
-    async fn tx(&mut self, data: &[u8]) -> Result<(), Box<dyn Error>> {
-        let characteristics = self.peripheral.characteristics();
-
-        let tx_characteristic = characteristics
-            .iter()
-            .filter(|c| c.uuid == TX_CHARACTERISTIC_UUID)
-            .next()
-            .unwrap();
-
-        self.peripheral
-            .write(
-                &tx_characteristic,
-                data,
-                btleplug::api::WriteType::WithoutResponse,
-            )
-            .await?;
 
         Ok(())
     }
